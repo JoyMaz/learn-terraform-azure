@@ -1,14 +1,4 @@
 variable "username" {
-type = list
-
+  type    = string
+  default = "default_user" # Add this line
 }
-
-#variable "age" {
-#    default = "20"
-#}
-
-
-output "printname" {
-  value = "first user is ${var.username[0]}"
-}
-

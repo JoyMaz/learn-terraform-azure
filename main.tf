@@ -4,9 +4,9 @@ resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
   location = "eastus"
   tags = {
-	environment = " first deployment"
-	team = "devops"
-		}
+    environment = " first deployment"
+    team        = "devops"
+  }
 }
 
 # Create a virtual network
