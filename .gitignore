@@ -3,4 +3,4 @@
 *.tfstate.backup
 .terraform.lock.hcl
 *.tfvars
-secrect.txt
+*.txt
