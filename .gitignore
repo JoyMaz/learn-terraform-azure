@@ -4,3 +4,4 @@
 .terraform.lock.hcl
 secret.txt
 *.log
+terraform.tfvars
