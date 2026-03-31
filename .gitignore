@@ -2,12 +2,6 @@
 *.tfstate
 *.tfstate.backup
 .terraform.lock.hcl
-<<<<<<< HEAD
-*.tfvars
-secret.txt
-*.log
-=======
 secret.txt
 *.tfvars
 *.log
->>>>>>> ec6ebf714e96fba4ceab078453c2c9bca3169765
