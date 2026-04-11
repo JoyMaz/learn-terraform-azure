@@ -1,0 +1,104 @@
+trigger:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  serviceConnection: 'Azure subscription 1(5b142d4f-8b9f-4227-93b5-62db77533fc2)'
+  terraformVersion: '1.6.0'
+
+steps:
+  - task: TerraformInstaller@1
+    displayName: 'Install Terraform'
+    inputs:
+      terraformVersion: $(terraformVersion)
+
+  - task: Bash@3
+    displayName: 'Clean Terraform Cache'    # ← Prevents stale backend config
+    inputs:
+      targetType: 'inline'
+      script: |
+        rm -rf $(Build.SourcesDirectory)/.terraform
+        rm -f $(Build.SourcesDirectory)/.terraform.lock.hcl
+        echo "Terraform cache cleaned successfully"
+
+  - task: AzureCLI@2
+    displayName: 'Terraform Init (with OIDC)'
+    inputs:
+      azureSubscription: $(serviceConnection)
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      addSpnToEnvironment: true
+      inlineScript: |
+        echo "=== Debug OIDC Token ==="
+        echo "Client ID:   $servicePrincipalId"
+        echo "Tenant ID:   $tenantId"
+        echo "Token empty? $([ -z "$idToken" ] && echo YES - THIS IS THE PROBLEM || echo NO - token present)"
+
+        export ARM_USE_OIDC="true"
+        export ARM_USE_AZUREAD="true"
+        export ARM_OIDC_TOKEN="$idToken"
+        export ARM_CLIENT_ID="$servicePrincipalId"
+        export ARM_TENANT_ID="$tenantId"
+        export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+
+        cd $(Build.SourcesDirectory)
+
+        terraform init \
+          -reconfigure \
+          -backend-config="resource_group_name=ResourceofJoy" \
+          -backend-config="storage_account_name=joymaz1234" \
+          -backend-config="container_name=tfstate" \
+          -backend-config="key=prod.terraform.tfstate" \
+          -backend-config="use_oidc=true" \
+          -backend-config="oidc_token=$idToken" \
+          -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID" \
+          -backend-config="tenant_id=$tenantId" \
+          -backend-config="client_id=$servicePrincipalId"
+
+  - task: AzureCLI@2
+    displayName: 'Terraform Validate & Plan (with OIDC)'
+    inputs:
+      azureSubscription: $(serviceConnection)
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      addSpnToEnvironment: true
+      inlineScript: |
+        export ARM_USE_OIDC="true"
+        export ARM_USE_AZUREAD="true"
+        export ARM_OIDC_TOKEN="$idToken"
+        export ARM_CLIENT_ID="$servicePrincipalId"
+        export ARM_TENANT_ID="$tenantId"
+        export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+
+        export TF_VAR_username="mazumdarjoy941@gmail.com"
+        export TF_VAR_location="westindia"
+        export TF_VAR_resource_group_name="ResourceofJoy1"
+
+        cd $(Build.SourcesDirectory)
+
+        echo "=== Terraform Format ==="
+        terraform fmt -check   # Use -check so it fails if fmt needed, remove flag to auto-fix
+
+        echo "=== Terraform Validate ==="
+        terraform validate
+
+        echo "=== Terraform Plan ==="
+        terraform plan -out "$(Build.SourcesDirectory)/tfplanfile"
+
+  - task: ArchiveFiles@2
+    displayName: 'Archive Plan and Code'
+    inputs:
+      rootFolderOrFile: '$(Build.SourcesDirectory)/'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+      replaceExistingArchive: true
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifacts'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactName: '$(Build.BuildId)-build'
+      publishLocation: 'Container'
